@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>粮仓日记 · 猫狗口粮记录</title>
+<style>
+  :root{
+    --ink:#1a1a1a;
+    --paper:#ffffff;
+    --gray:#888888;
+    --light:#f4f4f4;
+    --danger:#1a1a1a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;}
+  body{
+    background-image:
+      radial-gradient(circle at 1px 1px, #00000012 1px, transparent 0);
+    background-size: 14px 14px;
+    min-height:100vh;
+    padding-bottom:90px;
+  }
+  .header{
+    padding:20px 16px 10px;
+    border-bottom:3px solid var(--ink);
+    position:relative;
+  }
+  .header h1{
+    margin:0;
+    font-size:22px;
+    letter-spacing:1px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .header .sub{
+    margin-top:4px;
+    font-size:12px;
+    color:var(--gray);
+    letter-spacing:1px;
+  }
+  .doodle-cat, .doodle-dog{
+    position:absolute;
+    top:14px;
+    width:34px;
+    height:34px;
+  }
+  .doodle-cat{ right:52px; }
+  .doodle-dog{ right:12px; }
+
+  .tabs{
+    display:flex;
+    gap:0;
+    border-bottom:3px solid var(--ink);
+    background:var(--paper);
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:10px 6px;
+    font-size:14px;
+    font-weight:600;
+    border-right:2px solid var(--ink);
+    cursor:pointer;
+    position:relative;
+    user-select:none;
+  }
+  .tab:last-child{border-right:none;}
+  .tab.active{
+    background:var(--ink);
+    color:#fff;
+  }
+  .tab .count{
+    font-size:11px;
+    color:var(--gray);
+    margin-left:2px;
+  }
+  .tab.active .count{color:#ccc;}
+
+  .content{padding:14px;}
+
+  .empty{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--gray);
+  }
+  .empty svg{width:90px;height:90px;opacity:.8;}
+  .empty p{margin-top:10px;font-size:13px;}
+
+  .card{
+    border:2.5px solid var(--ink);
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+    position:relative;
+    background:var(--paper);
+    box-shadow:3px 3px 0 var(--ink);
+  }
+  .card.status-finished{opacity:.55;}
+  .card.status-warning{box-shadow:3px 3px 0 var(--ink), 0 0 0 2px transparent;}
+
+  .card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:8px;
+  }
+  .card-title{
+    font-size:16px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .badge{
+    font-size:10px;
+    border:1.5px solid var(--ink);
+    border-radius:10px;
+    padding:1px 8px;
+    white-space:nowrap;
+  }
+  .badge.eating{background:var(--ink);color:#fff;}
+  .badge.pending{background:#fff;color:var(--ink);}
+  .badge.finished{background:#fff;color:var(--gray);border-style:dashed;}
+  .badge.expiring{background:#fff;color:var(--ink);border-style:solid;font-weight:700;}
+
+  .card-actions{
+    display:flex;
+    gap:6px;
+  }
+  .icon-btn{
+    width:26px;height:26px;
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .icon-btn:active{background:var(--ink);color:#fff;}
+
+  .card-rows{
+    font-size:12.5px;
+    line-height:1.9;
+  }
+  .card-row{
+    display:flex;
+    justify-content:space-between;
+    border-bottom:1px dashed #ccc;
+    padding:2px 0;
+  }
+  .card-row:last-child{border-bottom:none;}
+  .card-row .label{color:var(--gray);}
+  .card-row .value{font-weight:600;}
+
+  .progress-wrap{
+    margin-top:10px;
+  }
+  .progress-bar{
+    height:10px;
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    overflow:hidden;
+    background:#fff;
+    position:relative;
+  }
+  .progress-fill{
+    height:100%;
+    background:
+      repeating-linear-gradient(45deg, var(--ink) 0 3px, transparent 3px 6px);
+  }
+  .progress-text{
+    font-size:11px;
+    color:var(--gray);
+    margin-top:3px;
+    display:flex;
+    justify-content:space-between;
+  }
+
+  .fab{
+    position:fixed;
+    right:18px;
+    bottom:24px;
+    width:56px;height:56px;
+    border-radius:50%;
+    background:var(--ink);
+    color:#fff;
+    border:2.5px solid var(--ink);
+    font-size:28px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:3px 3px 0 #00000055;
+    cursor:pointer;
+    z-index:20;
+  }
+  .fab:active{transform:scale(0.94);}
+
+  /* Modal */
+  .mask{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.4);
+    display:none;
+    align-items:flex-end;
+    justify-content:center;
+    z-index:50;
+  }
+  .mask.show{display:flex;}
+  .sheet{
+    width:100%;
+    max-width:480px;
+    background:#fff;
+    border-radius:18px 18px 0 0;
+    border-top:3px solid var(--ink);
+    padding:16px 16px 24px;
+    max-height:88vh;
+    overflow-y:auto;
+    animation:slideUp .2s ease-out;
+  }
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .sheet-title{
+    font-size:17px;font-weight:700;
+    margin-bottom:14px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .sheet-title .close{
+    font-size:20px;color:var(--gray);cursor:pointer;
+    width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  }
+  .form-group{margin-bottom:14px;}
+  .form-group label{
+    display:block;
+    font-size:12.5px;
+    color:var(--gray);
+    margin-bottom:5px;
+  }
+  .form-group input, .form-group select{
+    width:100%;
+    padding:10px 12px;
+    border:2px solid var(--ink);
+    border-radius:10px;
+    font-size:14px;
+    background:#fff;
+    color:var(--ink);
+    font-family:inherit;
+  }
+  .form-group input:focus, .form-group select:focus{outline:none;}
+  .pet-select{
+    display:flex;
+    gap:8px;
+  }
+  .pet-select .opt{
+    flex:1;
+    text-align:center;
+    padding:10px 0;
+    border:2px solid var(--ink);
+    border-radius:10px;
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .pet-select .opt.active{background:var(--ink);color:#fff;}
+  .row2{
+    display:flex;
+    gap:10px;
+  }
+  .row2 .form-group{flex:1;}
+
+  .submit-btn{
+    width:100%;
+    padding:13px;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:1px;
+    margin-top:6px;
+    cursor:pointer;
+  }
+  .submit-btn:active{opacity:.8;}
+  .del-link{
+    text-align:center;
+    font-size:12.5px;
+    color:var(--gray);
+    margin-top:14px;
+    text-decoration:underline;
+    cursor:pointer;
+  }
+  .hint{
+    font-size:11px;
+    color:var(--gray);
+    margin-top:4px;
+  }
+  .toast{
+    position:fixed;
+    top:20px;left:50%;
+    transform:translateX(-50%);
+    background:var(--ink);
+    color:#fff;
+    padding:8px 18px;
+    border-radius:20px;
+    font-size:12.5px;
+    z-index:100;
+    opacity:0;
+    transition:opacity .2s;
+    pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🐾 粮仓日记</h1>
+  <div class="sub">猫粮 · 狗粮采购与保质期记录</div>
+  <svg class="doodle-cat" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 22 L20 8 L26 22 Z"/>
+    <path d="M50 22 L44 8 L38 22 Z"/>
+    <circle cx="32" cy="34" r="20"/>
+    <circle cx="24" cy="30" r="2" fill="#1a1a1a"/>
+    <circle cx="40" cy="30" r="2" fill="#1a1a1a"/>
+    <path d="M28 40 Q32 44 36 40"/>
+    <path d="M32 36 L28 38 M32 36 L36 38"/>
+  </svg>
+  <svg class="doodle-dog" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="32" cy="34" r="18"/>
+    <path d="M15 22 Q6 30 14 40"/>
+    <path d="M49 22 Q58 30 50 40"/>
+    <circle cx="25" cy="30" r="2" fill="#1a1a1a"/>
+    <circle cx="39" cy="30" r="2" fill="#1a1a1a"/>
+    <ellipse cx="32" cy="38" rx="3" ry="2" fill="#1a1a1a"/>
+    <path d="M32 40 Q32 44 28 44"/>
+  </svg>
+</div>
+
+<div class="tabs" id="tabs"></div>
+
+<div class="content" id="content"></div>
+
+<div class="fab" id="fabAdd">+</div>
+
+<div class="mask" id="mask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span id="sheetTitleText">新增一袋粮</span>
+      <span class="close" id="closeSheet">✕</span>
+    </div>
+    <form id="foodForm">
+      <input type="hidden" id="editId">
+      <div class="form-group">
+        <label>宠物类型</label>
+        <div class="pet-select" id="petSelect">
+          <div class="opt active" data-pet="cat">🐱 猫</div>
+          <div class="opt" data-pet="dog">🐶 狗</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>品牌 / 名称</label>
+        <input type="text" id="fBrand" placeholder="例如：皇家幼猫粮 2kg" required>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>采购日期</label>
+          <input type="date" id="fBuyDate" required>
+        </div>
+        <div class="form-group">
+          <label>保质期至</label>
+          <input type="date" id="fExpireDate" required>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>开始吃日期</label>
+          <input type="date" id="fStartDate">
+          <div class="hint">留空表示还没开吃</div>
+        </div>
+        <div class="form-group">
+          <label>吃完日期</label>
+          <input type="date" id="fEndDate">
+          <div class="hint">留空表示还没吃完</div>
+        </div>
+      </div>
+      <button type="submit" class="submit-btn">保存记录</button>
+      <div class="del-link" id="delBtn" style="display:none;">删除这条记录</div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'pet_food_records_v1';
+  var currentTab = 'cat';
+
+  function loadData(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveData(list){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  }
+  var records = loadData();
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function todayStr(){
+    var d = new Date();
+    return d.toISOString().slice(0,10);
+  }
+  function daysBetween(a,b){
+    var d1 = new Date(a), d2 = new Date(b);
+    return Math.round((d2 - d1) / 86400000);
+  }
+  function fmtDate(s){
+    if(!s) return '-';
+    var p = s.split('-');
+    return p[0]+'.'+p[1]+'.'+p[2];
+  }
+
+  function getStatus(r){
+    var today = todayStr();
+    if(r.endDate) return 'finished';
+    if(r.startDate && r.startDate <= today) return 'eating';
+    return 'pending';
+  }
+
+  function render(){
+    renderTabs();
+    renderList();
+  }
+
+  function renderTabs(){
+    var catCount = records.filter(function(r){return r.pet==='cat';}).length;
+    var dogCount = records.filter(function(r){return r.pet==='dog';}).length;
+    var tabsEl = document.getElementById('tabs');
+    tabsEl.innerHTML =
+      '<div class="tab '+(currentTab==='cat'?'active':'')+'" data-tab="cat">🐱 猫粮 <span class="count">'+catCount+'</span></div>' +
+      '<div class="tab '+(currentTab==='dog'?'active':'')+'" data-tab="dog">🐶 狗粮 <span class="count">'+dogCount+'</span></div>';
+    Array.prototype.forEach.call(tabsEl.querySelectorAll('.tab'), function(el){
+      el.onclick = function(){
+        currentTab = el.getAttribute('data-tab');
+        render();
+      };
+    });
+  }
+
+  function renderList(){
+    var list = records.filter(function(r){return r.pet===currentTab;});
+    // sort: eating first, then pending, then finished; within group by buyDate desc
+    var order = {eating:0, pending:1, finished:2};
+    list.sort(function(a,b){
+      var sa = getStatus(a), sb = getStatus(b);
+      if(order[sa] !== order[sb]) return order[sa]-order[sb];
+      return b.buyDate.localeCompare(a.buyDate);
+    });
+
+    var content = document.getElementById('content');
+    if(list.length === 0){
+      content.innerHTML =
+        '<div class="empty">' +
+        '<svg viewBox="0 0 100 100" fill="none" stroke="#888" stroke-width="3" stroke-linecap="round">' +
+        '<rect x="25" y="35" width="50" height="45" rx="4"/>' +
+        '<path d="M30 35 L50 15 L70 35"/>' +
+        '<circle cx="50" cy="58" r="10"/>' +
+        '<path d="M46 58 L54 58 M50 54 L50 62"/>' +
+        '</svg>' +
+        '<p>还没有'+(currentTab==='cat'?'猫粮':'狗粮')+'记录，点击右下角 + 添加</p>' +
+        '</div>';
+      return;
+    }
+
+    var html = '';
+    list.forEach(function(r){
+      var status = getStatus(r);
+      var badgeHtml = '';
+      var expDaysLeft = daysBetween(todayStr(), r.expireDate);
+      var isExpiringSoon = status !== 'finished' && expDaysLeft <= 7;
+
+      if(status === 'finished'){
+        badgeHtml = '<span class="badge finished">已吃完</span>';
+      } else if(isExpiringSoon){
+        badgeHtml = '<span class="badge expiring">'+(expDaysLeft<0? '已过期':'临期 '+expDaysLeft+'天')+'</span>';
+      } else if(status === 'eating'){
+        badgeHtml = '<span class="badge eating">正在吃</span>';
+      } else {
+        badgeHtml = '<span class="badge pending">待开袋</span>';
+      }
+
+      var progressHtml = '';
+      if(r.startDate){
+        var endPoint = r.endDate || todayStr();
+        var totalGuess = r.endDate ? daysBetween(r.startDate, r.endDate) : null;
+        var elapsed = daysBetween(r.startDate, endPoint);
+        var pct;
+        if(r.endDate){
+          pct = 100;
+        } else {
+          // estimate progress against shelf-life window as rough visual, cap at 92% until marked finished
+          var span = Math.max(daysBetween(r.startDate, r.expireDate), 1);
+          pct = Math.min(Math.round((elapsed/span)*100), 92);
+          if(pct < 0) pct = 0;
+        }
+        progressHtml =
+          '<div class="progress-wrap">' +
+          '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div>' +
+          '<div class="progress-text"><span>已吃 '+elapsed+' 天</span><span>'+pct+'%</span></div>' +
+          '</div>';
+      }
+
+      html +=
+        '<div class="card status-'+status+'" data-id="'+r.id+'">' +
+          '<div class="card-top">' +
+            '<div class="card-title">'+(r.pet==='cat'?'🐱':'🐶')+' '+escapeHtml(r.brand)+'</div>' +
+            '<div class="card-actions">' + badgeHtml +
+              '<div class="icon-btn edit-btn">✎</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="card-rows">' +
+            '<div class="card-row"><span class="label">采购日期</span><span class="value">'+fmtDate(r.buyDate)+'</span></div>' +
+            '<div class="card-row"><span class="label">保质期至</span><span class="value">'+fmtDate(r.expireDate)+'</span></div>' +
+            '<div class="card-row"><span class="label">开始吃</span><span class="value">'+(r.startDate?fmtDate(r.startDate):'未开袋')+'</span></div>' +
+            '<div class="card-row"><span class="label">吃完</span><span class="value">'+(r.endDate?fmtDate(r.endDate):'进行中')+'</span></div>' +
+          '</div>' +
+          progressHtml +
+        '</div>';
+    });
+    content.innerHTML = html;
+
+    Array.prototype.forEach.call(content.querySelectorAll('.card'), function(cardEl){
+      cardEl.querySelector('.edit-btn').onclick = function(){
+        var id = cardEl.getAttribute('data-id');
+        openSheet(records.find(function(r){return r.id===id;}));
+      };
+    });
+  }
+
+  function escapeHtml(s){
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // ---- Sheet / Form ----
+  var mask = document.getElementById('mask');
+  var form = document.getElementById('foodForm');
+  var petSelect = document.getElementById('petSelect');
+  var selectedPet = 'cat';
+
+  function openSheet(record){
+    form.reset();
+    document.getElementById('delBtn').style.display = record ? 'block' : 'none';
+    document.getElementById('sheetTitleText').textContent = record ? '编辑记录' : '新增一袋粮';
+    document.getElementById('editId').value = record ? record.id : '';
+    selectedPet = record ? record.pet : currentTab;
+    updatePetSelectUI();
+
+    if(record){
+      document.getElementById('fBrand').value = record.brand;
+      document.getElementById('fBuyDate').value = record.buyDate;
+      document.getElementById('fExpireDate').value = record.expireDate;
+      document.getElementById('fStartDate').value = record.startDate || '';
+      document.getElementById('fEndDate').value = record.endDate || '';
+    } else {
+      document.getElementById('fBuyDate').value = todayStr();
+    }
+    mask.classList.add('show');
+  }
+  function closeSheet(){
+    mask.classList.remove('show');
+  }
+  function updatePetSelectUI(){
+    Array.prototype.forEach.call(petSelect.querySelectorAll('.opt'), function(el){
+      el.classList.toggle('active', el.getAttribute('data-pet') === selectedPet);
+    });
+  }
+  petSelect.addEventListener('click', function(e){
+    var opt = e.target.closest('.opt');
+    if(!opt) return;
+    selectedPet = opt.getAttribute('data-pet');
+    updatePetSelectUI();
+  });
+
+  document.getElementById('fabAdd').onclick = function(){ openSheet(null); };
+  document.getElementById('closeSheet').onclick = closeSheet;
+  mask.addEventListener('click', function(e){ if(e.target === mask) closeSheet(); });
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var id = document.getElementById('editId').value;
+    var brand = document.getElementById('fBrand').value.trim();
+    var buyDate = document.getElementById('fBuyDate').value;
+    var expireDate = document.getElementById('fExpireDate').value;
+    var startDate = document.getElementById('fStartDate').value;
+    var endDate = document.getElementById('fEndDate').value;
+
+    if(!brand || !buyDate || !expireDate){
+      showToast('请填写完整信息');
+      return;
+    }
+    if(endDate && startDate && endDate < startDate){
+      showToast('吃完日期不能早于开始吃日期');
+      return;
+    }
+
+    if(id){
+      var idx = records.findIndex(function(r){return r.id===id;});
+      if(idx > -1){
+        records[idx] = Object.assign({}, records[idx], {
+          pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
+          startDate: startDate || '', endDate: endDate || ''
+        });
+      }
+    } else {
+      records.push({
+        id: uid(), pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
+        startDate: startDate || '', endDate: endDate || ''
+      });
+    }
+    saveData(records);
+    currentTab = selectedPet;
+    closeSheet();
+    render();
+    showToast('已保存');
+  });
+
+  document.getElementById('delBtn').onclick = function(){
+    var id = document.getElementById('editId').value;
+    if(!id) return;
+    if(!confirm('确定删除这条记录吗？')) return;
+    records = records.filter(function(r){return r.id!==id;});
+    saveData(records);
+    closeSheet();
+    render();
+    showToast('已删除');
+  };
+
+  var toastTimer = null;
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
