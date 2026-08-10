@@ -41,6 +41,21 @@
     color:var(--gray);
     letter-spacing:1px;
   }
+  .sync-bar{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+  }
+  .sync-btn{
+    font-size:11.5px;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:4px 10px;
+    background:#fff;
+    cursor:pointer;
+    user-select:none;
+  }
+  .sync-btn:active{background:var(--ink);color:#fff;}
   .doodle-cat, .doodle-dog{
     position:absolute;
     top:14px;
@@ -308,6 +323,44 @@
     pointer-events:none;
   }
   .toast.show{opacity:1;}
+
+  .sheet textarea{
+    width:100%;
+    height:120px;
+    padding:10px 12px;
+    border:2px solid var(--ink);
+    border-radius:10px;
+    font-size:12px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    resize:none;
+  }
+  .copy-btn{
+    width:100%;
+    padding:11px;
+    background:#fff;
+    color:var(--ink);
+    border:2px solid var(--ink);
+    border-radius:12px;
+    font-size:14px;
+    font-weight:700;
+    margin-top:10px;
+    cursor:pointer;
+  }
+  .copy-btn:active{background:var(--ink);color:#fff;}
+  .sync-hint{
+    font-size:11.5px;
+    color:var(--gray);
+    line-height:1.7;
+    margin-bottom:10px;
+  }
+  .merge-summary{
+    font-size:12.5px;
+    background:var(--light);
+    border-radius:10px;
+    padding:10px 12px;
+    margin-bottom:12px;
+    line-height:1.8;
+  }
 </style>
 </head>
 <body>
@@ -315,6 +368,10 @@
 <div class="header">
   <h1>🐾 粮仓日记</h1>
   <div class="sub">猫粮 · 狗粮采购与保质期记录</div>
+  <div class="sync-bar">
+    <div class="sync-btn" id="exportBtn">📤 导出给对方</div>
+    <div class="sync-btn" id="importBtn">📥 导入对方的</div>
+  </div>
   <svg class="doodle-cat" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 22 L20 8 L26 22 Z"/>
     <path d="M50 22 L44 8 L38 22 Z"/>
@@ -389,6 +446,32 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Export sheet -->
+<div class="mask" id="exportMask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span>导出数据给对方</span>
+      <span class="close" id="closeExportSheet">✕</span>
+    </div>
+    <div class="sync-hint">复制下面这段文字，通过微信发给对方，对方在自己手机上点「导入对方的」粘贴即可同步。</div>
+    <textarea id="exportText" readonly></textarea>
+    <button class="copy-btn" id="copyExportBtn">复制到剪贴板</button>
+  </div>
+</div>
+
+<!-- Import sheet -->
+<div class="mask" id="importMask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span>导入对方的数据</span>
+      <span class="close" id="closeImportSheet">✕</span>
+    </div>
+    <div class="sync-hint">把对方发来的那段文字粘贴到下面，点击合并。相同记录会自动去重，双方新增/修改的记录都会保留。</div>
+    <textarea id="importText" placeholder="粘贴对方发来的文字..."></textarea>
+    <button class="copy-btn" id="doImportBtn">合并数据</button>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -611,13 +694,13 @@
       if(idx > -1){
         records[idx] = Object.assign({}, records[idx], {
           pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
-          startDate: startDate || '', endDate: endDate || ''
+          startDate: startDate || '', endDate: endDate || '', updatedAt: Date.now()
         });
       }
     } else {
       records.push({
         id: uid(), pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
-        startDate: startDate || '', endDate: endDate || ''
+        startDate: startDate || '', endDate: endDate || '', updatedAt: Date.now()
       });
     }
     saveData(records);
@@ -646,6 +729,78 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 1600);
   }
+
+  // ---- Export / Import sync ----
+  var exportMask = document.getElementById('exportMask');
+  var importMask = document.getElementById('importMask');
+
+  document.getElementById('exportBtn').onclick = function(){
+    var payload = { type:'pet_food_sync_v1', records: records };
+    var text = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    document.getElementById('exportText').value = text;
+    exportMask.classList.add('show');
+  };
+  document.getElementById('closeExportSheet').onclick = function(){
+    exportMask.classList.remove('show');
+  };
+  exportMask.addEventListener('click', function(e){ if(e.target === exportMask) exportMask.classList.remove('show'); });
+
+  document.getElementById('copyExportBtn').onclick = function(){
+    var ta = document.getElementById('exportText');
+    ta.select();
+    ta.setSelectionRange(0, 99999);
+    try{
+      document.execCommand('copy');
+      showToast('已复制，去微信发给对方吧');
+    }catch(e){
+      showToast('复制失败，请长按文本框手动复制');
+    }
+  };
+
+  document.getElementById('importBtn').onclick = function(){
+    document.getElementById('importText').value = '';
+    importMask.classList.add('show');
+  };
+  document.getElementById('closeImportSheet').onclick = function(){
+    importMask.classList.remove('show');
+  };
+  importMask.addEventListener('click', function(e){ if(e.target === importMask) importMask.classList.remove('show'); });
+
+  document.getElementById('doImportBtn').onclick = function(){
+    var raw = document.getElementById('importText').value.trim();
+    if(!raw){ showToast('请先粘贴对方发来的内容'); return; }
+    var payload;
+    try{
+      payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    }catch(e){
+      showToast('内容格式不对，请检查是否完整复制');
+      return;
+    }
+    if(!payload || payload.type !== 'pet_food_sync_v1' || !Array.isArray(payload.records)){
+      showToast('内容格式不对，请检查是否完整复制');
+      return;
+    }
+
+    var added = 0, updated = 0;
+    payload.records.forEach(function(incoming){
+      var idx = records.findIndex(function(r){return r.id === incoming.id;});
+      if(idx === -1){
+        records.push(incoming);
+        added++;
+      } else {
+        var localTime = records[idx].updatedAt || 0;
+        var incomingTime = incoming.updatedAt || 0;
+        if(incomingTime > localTime){
+          records[idx] = incoming;
+          updated++;
+        }
+      }
+    });
+    saveData(records);
+    importMask.classList.remove('show');
+    render();
+    showToast('已合并：新增'+added+'条，更新'+updated+'条');
+  };
 
   render();
 })();
