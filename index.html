@@ -139,6 +139,23 @@
     display:flex;
     align-items:center;
     gap:6px;
+    flex-wrap:wrap;
+  }
+  .spec-tag{
+    font-size:11px;
+    font-weight:600;
+    color:var(--gray);
+    border:1.5px solid var(--gray);
+    border-radius:8px;
+    padding:1px 7px;
+  }
+  .price-tag{
+    font-size:13px;
+    font-weight:700;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:1px 9px;
+    white-space:nowrap;
   }
   .badge{
     font-size:10px;
@@ -678,16 +695,18 @@
       html +=
         '<div class="card status-'+status+'" data-id="'+r.id+'">' +
           '<div class="card-top">' +
-            '<div class="card-title">'+(r.pet==='cat'?'🐱':'🐶')+' '+escapeHtml(r.brand)+'</div>' +
-            '<div class="card-actions">' + badgeHtml +
+            '<div class="card-title">'+(r.pet==='cat'?'🐱':'🐶')+' '+escapeHtml(r.brand)+
+              (r.weight ? ' <span class="spec-tag">'+r.weight+'kg</span>' : '') +
+            '</div>' +
+            '<div class="card-actions">' +
+              (r.price ? '<span class="price-tag">¥'+r.price+'</span>' : '') +
+              badgeHtml +
               '<div class="icon-btn edit-btn">✎</div>' +
             '</div>' +
           '</div>' +
           '<div class="card-rows">' +
             '<div class="card-row"><span class="label">采购日期</span><span class="value">'+fmtDate(r.buyDate)+'</span></div>' +
             '<div class="card-row"><span class="label">保质期至</span><span class="value">'+fmtDate(r.expireDate)+'</span></div>' +
-            (r.weight ? '<div class="card-row"><span class="label">净重</span><span class="value">'+r.weight+' kg</span></div>' : '') +
-            (r.price ? '<div class="card-row"><span class="label">价格</span><span class="value">¥'+r.price+'</span></div>' : '') +
             '<div class="card-row"><span class="label">开始吃</span><span class="value">'+(r.startDate?fmtDate(r.startDate):'未开袋')+'</span></div>' +
             '<div class="card-row"><span class="label">吃完</span><span class="value">'+(r.endDate?fmtDate(r.endDate):'进行中')+'</span></div>' +
           '</div>' +
