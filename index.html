@@ -56,6 +56,17 @@
     user-select:none;
   }
   .sync-btn:active{background:var(--ink);color:#fff;}
+  .stats-btn{
+    font-size:11.5px;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:4px 10px;
+    background:var(--ink);
+    color:#fff;
+    cursor:pointer;
+    user-select:none;
+  }
+  .stats-btn:active{opacity:.8;}
   .doodle-cat, .doodle-dog{
     position:absolute;
     top:14px;
@@ -361,6 +372,53 @@
     margin-bottom:12px;
     line-height:1.8;
   }
+
+  .stats-year-tabs{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .stats-year-tab{
+    font-size:12.5px;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:5px 12px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .stats-year-tab.active{
+    background:var(--ink);
+    color:#fff;
+  }
+  .stats-block{
+    border:2px solid var(--ink);
+    border-radius:12px;
+    padding:12px 14px;
+    margin-bottom:12px;
+  }
+  .stats-block h4{
+    margin:0 0 8px;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .stats-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+    padding:4px 0;
+    border-bottom:1px dashed #ddd;
+  }
+  .stats-row:last-child{border-bottom:none;}
+  .stats-row .num{font-weight:700;}
+  .stats-empty{
+    text-align:center;
+    color:var(--gray);
+    font-size:12.5px;
+    padding:20px 0;
+  }
 </style>
 </head>
 <body>
@@ -371,6 +429,7 @@
   <div class="sync-bar">
     <div class="sync-btn" id="exportBtn">📤 导出给对方</div>
     <div class="sync-btn" id="importBtn">📥 导入对方的</div>
+    <div class="stats-btn" id="statsBtn">📊 年度统计</div>
   </div>
   <svg class="doodle-cat" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 22 L20 8 L26 22 Z"/>
@@ -416,6 +475,16 @@
       <div class="form-group">
         <label>品牌 / 名称</label>
         <input type="text" id="fBrand" placeholder="例如：皇家幼猫粮 2kg" required>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>净重（kg）</label>
+          <input type="number" id="fWeight" placeholder="例如：2" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label>价格（元）</label>
+          <input type="number" id="fPrice" placeholder="例如：128" step="0.01" min="0">
+        </div>
       </div>
       <div class="row2">
         <div class="form-group">
@@ -470,6 +539,18 @@
     <div class="sync-hint">把对方发来的那段文字粘贴到下面，点击合并。相同记录会自动去重，双方新增/修改的记录都会保留。</div>
     <textarea id="importText" placeholder="粘贴对方发来的文字..."></textarea>
     <button class="copy-btn" id="doImportBtn">合并数据</button>
+  </div>
+</div>
+
+<!-- Stats sheet -->
+<div class="mask" id="statsMask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span>年度统计</span>
+      <span class="close" id="closeStatsSheet">✕</span>
+    </div>
+    <div class="stats-year-tabs" id="statsYearTabs"></div>
+    <div id="statsContent"></div>
   </div>
 </div>
 
@@ -605,6 +686,8 @@
           '<div class="card-rows">' +
             '<div class="card-row"><span class="label">采购日期</span><span class="value">'+fmtDate(r.buyDate)+'</span></div>' +
             '<div class="card-row"><span class="label">保质期至</span><span class="value">'+fmtDate(r.expireDate)+'</span></div>' +
+            (r.weight ? '<div class="card-row"><span class="label">净重</span><span class="value">'+r.weight+' kg</span></div>' : '') +
+            (r.price ? '<div class="card-row"><span class="label">价格</span><span class="value">¥'+r.price+'</span></div>' : '') +
             '<div class="card-row"><span class="label">开始吃</span><span class="value">'+(r.startDate?fmtDate(r.startDate):'未开袋')+'</span></div>' +
             '<div class="card-row"><span class="label">吃完</span><span class="value">'+(r.endDate?fmtDate(r.endDate):'进行中')+'</span></div>' +
           '</div>' +
@@ -647,6 +730,8 @@
       document.getElementById('fExpireDate').value = record.expireDate;
       document.getElementById('fStartDate').value = record.startDate || '';
       document.getElementById('fEndDate').value = record.endDate || '';
+      document.getElementById('fWeight').value = record.weight || '';
+      document.getElementById('fPrice').value = record.price || '';
     } else {
       document.getElementById('fBuyDate').value = todayStr();
     }
@@ -679,6 +764,8 @@
     var expireDate = document.getElementById('fExpireDate').value;
     var startDate = document.getElementById('fStartDate').value;
     var endDate = document.getElementById('fEndDate').value;
+    var weight = document.getElementById('fWeight').value;
+    var price = document.getElementById('fPrice').value;
 
     if(!brand || !buyDate || !expireDate){
       showToast('请填写完整信息');
@@ -694,13 +781,17 @@
       if(idx > -1){
         records[idx] = Object.assign({}, records[idx], {
           pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
-          startDate: startDate || '', endDate: endDate || '', updatedAt: Date.now()
+          startDate: startDate || '', endDate: endDate || '',
+          weight: weight ? parseFloat(weight) : 0, price: price ? parseFloat(price) : 0,
+          updatedAt: Date.now()
         });
       }
     } else {
       records.push({
         id: uid(), pet: selectedPet, brand: brand, buyDate: buyDate, expireDate: expireDate,
-        startDate: startDate || '', endDate: endDate || '', updatedAt: Date.now()
+        startDate: startDate || '', endDate: endDate || '',
+        weight: weight ? parseFloat(weight) : 0, price: price ? parseFloat(price) : 0,
+        updatedAt: Date.now()
       });
     }
     saveData(records);
@@ -801,6 +892,88 @@
     render();
     showToast('已合并：新增'+added+'条，更新'+updated+'条');
   };
+
+  // ---- Stats ----
+  var statsMask = document.getElementById('statsMask');
+  var statsYear = null;
+
+  function getYear(dateStr){
+    return dateStr ? dateStr.slice(0,4) : null;
+  }
+
+  function computeStats(year){
+    // records counted by purchase year (buyDate), matching "每年吃多少/花费多少"
+    var yearRecords = records.filter(function(r){ return getYear(r.buyDate) === year; });
+    var result = { cat: { count:0, weight:0, cost:0 }, dog: { count:0, weight:0, cost:0 } };
+    yearRecords.forEach(function(r){
+      var bucket = result[r.pet];
+      if(!bucket) return;
+      bucket.count += 1;
+      bucket.weight += (r.weight || 0);
+      bucket.cost += (r.price || 0);
+    });
+    return result;
+  }
+
+  function renderStats(){
+    var years = Array.from(new Set(records.map(function(r){ return getYear(r.buyDate); }).filter(Boolean)));
+    years.sort(function(a,b){ return b.localeCompare(a); });
+
+    var yearTabsEl = document.getElementById('statsYearTabs');
+    var contentEl = document.getElementById('statsContent');
+
+    if(years.length === 0){
+      yearTabsEl.innerHTML = '';
+      contentEl.innerHTML = '<div class="stats-empty">还没有采购记录，添加记录后这里会显示年度统计</div>';
+      return;
+    }
+
+    if(!statsYear || years.indexOf(statsYear) === -1){
+      statsYear = years[0];
+    }
+
+    yearTabsEl.innerHTML = years.map(function(y){
+      return '<div class="stats-year-tab '+(y===statsYear?'active':'')+'" data-year="'+y+'">'+y+'年</div>';
+    }).join('');
+    Array.prototype.forEach.call(yearTabsEl.querySelectorAll('.stats-year-tab'), function(el){
+      el.onclick = function(){
+        statsYear = el.getAttribute('data-year');
+        renderStats();
+      };
+    });
+
+    var s = computeStats(statsYear);
+    var totalCost = s.cat.cost + s.dog.cost;
+    var totalCount = s.cat.count + s.dog.count;
+
+    contentEl.innerHTML =
+      '<div class="stats-block">' +
+        '<h4>🐱 猫粮</h4>' +
+        '<div class="stats-row"><span>采购次数</span><span class="num">'+s.cat.count+' 次</span></div>' +
+        '<div class="stats-row"><span>累计重量</span><span class="num">'+s.cat.weight.toFixed(2)+' kg</span></div>' +
+        '<div class="stats-row"><span>累计花费</span><span class="num">¥'+s.cat.cost.toFixed(2)+'</span></div>' +
+      '</div>' +
+      '<div class="stats-block">' +
+        '<h4>🐶 狗粮</h4>' +
+        '<div class="stats-row"><span>采购次数</span><span class="num">'+s.dog.count+' 次</span></div>' +
+        '<div class="stats-row"><span>累计重量</span><span class="num">'+s.dog.weight.toFixed(2)+' kg</span></div>' +
+        '<div class="stats-row"><span>累计花费</span><span class="num">¥'+s.dog.cost.toFixed(2)+'</span></div>' +
+      '</div>' +
+      '<div class="stats-block">' +
+        '<h4>📊 '+statsYear+'年总计</h4>' +
+        '<div class="stats-row"><span>总采购次数</span><span class="num">'+totalCount+' 次</span></div>' +
+        '<div class="stats-row"><span>总花费</span><span class="num">¥'+totalCost.toFixed(2)+'</span></div>' +
+      '</div>';
+  }
+
+  document.getElementById('statsBtn').onclick = function(){
+    renderStats();
+    statsMask.classList.add('show');
+  };
+  document.getElementById('closeStatsSheet').onclick = function(){
+    statsMask.classList.remove('show');
+  };
+  statsMask.addEventListener('click', function(e){ if(e.target === statsMask) statsMask.classList.remove('show'); });
 
   render();
 })();
