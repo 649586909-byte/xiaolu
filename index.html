@@ -436,17 +436,80 @@
     font-size:12.5px;
     padding:20px 0;
   }
+
+  .mode-switch{
+    display:flex;
+    margin:12px 0 0;
+    border:2px solid var(--ink);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .mode-switch .mode-opt{
+    flex:1;
+    text-align:center;
+    padding:8px 0;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .mode-switch .mode-opt.active{
+    background:var(--ink);
+    color:#fff;
+  }
+  .deworm-type{
+    font-size:11px;
+    font-weight:700;
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    padding:1px 8px;
+    white-space:nowrap;
+  }
+  .deworm-type.inner{background:var(--ink);color:#fff;}
+  .deworm-type.outer{background:#fff;color:var(--ink);}
+  .type-select{
+    display:flex;
+    gap:8px;
+  }
+  .type-select .opt{
+    flex:1;
+    text-align:center;
+    padding:10px 0;
+    border:2px solid var(--ink);
+    border-radius:10px;
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .type-select .opt.active{background:var(--ink);color:#fff;}
+  .pet-select.four{flex-wrap:wrap;}
+  .pet-select.four .opt{flex:0 0 calc(50% - 4px);}
+  .quick-cat{
+    margin-top:8px;
+    text-align:center;
+    font-size:12px;
+    border:1.5px dashed var(--ink);
+    border-radius:10px;
+    padding:7px 0;
+    cursor:pointer;
+    user-select:none;
+  }
+  .quick-cat:active{background:var(--ink);color:#fff;}
 </style>
 </head>
 <body>
 
 <div class="header">
   <h1>🐾 粮仓日记</h1>
-  <div class="sub">猫粮 · 狗粮采购与保质期记录</div>
+  <div class="sub">口粮采购保质期 · 驱虫记录</div>
   <div class="sync-bar">
     <div class="sync-btn" id="exportBtn">📤 导出给对方</div>
     <div class="sync-btn" id="importBtn">📥 导入对方的</div>
     <div class="stats-btn" id="statsBtn">📊 年度统计</div>
+  </div>
+  <div class="mode-switch" id="modeSwitch">
+    <div class="mode-opt active" data-mode="food">🍚 口粮记录</div>
+    <div class="mode-opt" data-mode="deworm">💊 驱虫记录</div>
   </div>
   <svg class="doodle-cat" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 22 L20 8 L26 22 Z"/>
@@ -531,6 +594,56 @@
   </div>
 </div>
 
+<!-- Deworm form sheet -->
+<div class="mask" id="dewormMask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span id="dewormTitleText">新增驱虫记录</span>
+      <span class="close" id="closeDewormSheet">✕</span>
+    </div>
+    <form id="dewormForm">
+      <input type="hidden" id="dEditId">
+      <div class="form-group">
+        <label>宠物 <span id="dewormPetHint" style="color:var(--gray);font-weight:400;"></span></label>
+        <div class="pet-select four" id="dewormPetSelect">
+          <div class="opt active" data-pet="努努">🐶 努努</div>
+          <div class="opt" data-pet="小菊">🐱 小菊</div>
+          <div class="opt" data-pet="提伯斯">🐱 提伯斯</div>
+          <div class="opt" data-pet="小白">🐱 小白</div>
+        </div>
+        <div class="quick-cat" id="quickCatBtn">🐱 三只猫一起（小菊·提伯斯·小白）</div>
+      </div>
+      <div class="form-group">
+        <label>驱虫类型</label>
+        <div class="type-select" id="dewormTypeSelect">
+          <div class="opt active" data-type="inner">体内驱虫</div>
+          <div class="opt" data-type="outer">体外驱虫</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>药品品牌 / 名称</label>
+        <input type="text" id="dBrand" placeholder="例如：拜宠清 / 大宠爱" required>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>剂量</label>
+          <input type="text" id="dDosage" placeholder="例如：1片 / 0.5ml">
+        </div>
+        <div class="form-group">
+          <label>价格（元）</label>
+          <input type="number" id="dPrice" placeholder="例如：45" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>驱虫日期</label>
+        <input type="date" id="dDate" required>
+      </div>
+      <button type="submit" class="submit-btn">保存记录</button>
+      <div class="del-link" id="dDelBtn" style="display:none;">删除这条记录</div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Export sheet -->
@@ -574,7 +687,10 @@
 <script>
 (function(){
   var STORAGE_KEY = 'pet_food_records_v1';
+  var DEWORM_KEY = 'pet_deworm_records_v1';
   var currentTab = 'cat';
+  var currentMode = 'food';          // 'food' | 'deworm'
+  var currentDewormPet = '努努';
 
   function loadData(){
     try{
@@ -585,7 +701,28 @@
   function saveData(list){
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   }
+  function loadDeworm(){
+    try{
+      var raw = localStorage.getItem(DEWORM_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveDeworm(list){
+    localStorage.setItem(DEWORM_KEY, JSON.stringify(list));
+  }
   var records = loadData();
+  var dewormRecords = loadDeworm();
+
+  var DEWORM_PETS = [
+    {name:'努努', kind:'dog'},
+    {name:'小菊', kind:'cat'},
+    {name:'提伯斯', kind:'cat'},
+    {name:'小白', kind:'cat'}
+  ];
+  function petEmoji(name){
+    var p = DEWORM_PETS.filter(function(x){return x.name===name;})[0];
+    return p && p.kind==='dog' ? '🐶' : '🐱';
+  }
 
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
   function todayStr(){
@@ -610,8 +747,15 @@
   }
 
   function render(){
-    renderTabs();
-    renderList();
+    if(currentMode === 'deworm'){
+      document.getElementById('statsBtn').style.display = '';
+      renderDewormTabs();
+      renderDewormList();
+    } else {
+      document.getElementById('statsBtn').style.display = '';
+      renderTabs();
+      renderList();
+    }
   }
 
   function renderTabs(){
@@ -729,6 +873,73 @@
     return div.innerHTML;
   }
 
+  // ---- Deworm list ----
+  function renderDewormTabs(){
+    var tabsEl = document.getElementById('tabs');
+    tabsEl.innerHTML = DEWORM_PETS.map(function(p){
+      var cnt = dewormRecords.filter(function(r){return r.pet===p.name;}).length;
+      return '<div class="tab '+(currentDewormPet===p.name?'active':'')+'" data-pet="'+p.name+'">'+
+        (p.kind==='dog'?'🐶':'🐱')+' '+p.name+' <span class="count">'+cnt+'</span></div>';
+    }).join('');
+    Array.prototype.forEach.call(tabsEl.querySelectorAll('.tab'), function(el){
+      el.onclick = function(){
+        currentDewormPet = el.getAttribute('data-pet');
+        render();
+      };
+    });
+  }
+
+  function renderDewormList(){
+    var list = dewormRecords.filter(function(r){return r.pet===currentDewormPet;});
+    list.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+    var content = document.getElementById('content');
+    if(list.length === 0){
+      content.innerHTML =
+        '<div class="empty">' +
+        '<svg viewBox="0 0 100 100" fill="none" stroke="#888" stroke-width="3" stroke-linecap="round">' +
+        '<ellipse cx="50" cy="38" rx="18" ry="24"/>' +
+        '<line x1="50" y1="14" x2="50" y2="62"/>' +
+        '<path d="M38 70 L62 70 L58 86 L42 86 Z"/>' +
+        '</svg>' +
+        '<p>'+currentDewormPet+'还没有驱虫记录，点击右下角 + 添加</p>' +
+        '</div>';
+      return;
+    }
+
+    var html = '';
+    list.forEach(function(r){
+      var typeHtml = r.type === 'inner'
+        ? '<span class="deworm-type inner">体内驱虫</span>'
+        : '<span class="deworm-type outer">体外驱虫</span>';
+      html +=
+        '<div class="card" data-id="'+r.id+'">' +
+          '<div class="card-top">' +
+            '<div class="card-title">'+petEmoji(r.pet)+' '+escapeHtml(r.brand)+'</div>' +
+            '<div class="card-actions">' +
+              (r.price ? '<span class="price-tag">¥'+r.price+'</span>' : '') +
+              typeHtml +
+              '<div class="icon-btn edit-btn">✎</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="card-rows">' +
+            '<div class="card-row"><span class="label">宠物</span><span class="value">'+escapeHtml(r.pet)+'</span></div>' +
+            '<div class="card-row"><span class="label">类型</span><span class="value">'+(r.type==='inner'?'体内驱虫':'体外驱虫')+'</span></div>' +
+            (r.dosage ? '<div class="card-row"><span class="label">剂量</span><span class="value">'+escapeHtml(r.dosage)+'</span></div>' : '') +
+            '<div class="card-row"><span class="label">驱虫日期</span><span class="value">'+fmtDate(r.date)+'</span></div>' +
+          '</div>' +
+        '</div>';
+    });
+    content.innerHTML = html;
+
+    Array.prototype.forEach.call(content.querySelectorAll('.card'), function(cardEl){
+      cardEl.querySelector('.edit-btn').onclick = function(){
+        var id = cardEl.getAttribute('data-id');
+        openDewormSheet(dewormRecords.find(function(r){return r.id===id;}));
+      };
+    });
+  }
+
   // ---- Sheet / Form ----
   var mask = document.getElementById('mask');
   var form = document.getElementById('foodForm');
@@ -771,9 +982,24 @@
     updatePetSelectUI();
   });
 
-  document.getElementById('fabAdd').onclick = function(){ openSheet(null); };
+  document.getElementById('fabAdd').onclick = function(){
+    if(currentMode === 'deworm'){ openDewormSheet(null); }
+    else { openSheet(null); }
+  };
   document.getElementById('closeSheet').onclick = closeSheet;
   mask.addEventListener('click', function(e){ if(e.target === mask) closeSheet(); });
+
+  // ---- Mode switch ----
+  var modeSwitch = document.getElementById('modeSwitch');
+  modeSwitch.addEventListener('click', function(e){
+    var opt = e.target.closest('.mode-opt');
+    if(!opt) return;
+    currentMode = opt.getAttribute('data-mode');
+    Array.prototype.forEach.call(modeSwitch.querySelectorAll('.mode-opt'), function(el){
+      el.classList.toggle('active', el.getAttribute('data-mode') === currentMode);
+    });
+    render();
+  });
 
   form.addEventListener('submit', function(e){
     e.preventDefault();
@@ -831,6 +1057,132 @@
     showToast('已删除');
   };
 
+  // ---- Deworm form ----
+  var dewormMask = document.getElementById('dewormMask');
+  var dewormForm = document.getElementById('dewormForm');
+  var dewormPetSelect = document.getElementById('dewormPetSelect');
+  var dewormTypeSelect = document.getElementById('dewormTypeSelect');
+  var selectedDewormPets = ['努努'];
+  var selectedDewormType = 'inner';
+  var dewormEditing = false;
+
+  function updateDewormSelectUI(){
+    Array.prototype.forEach.call(dewormPetSelect.querySelectorAll('.opt'), function(el){
+      el.classList.toggle('active', selectedDewormPets.indexOf(el.getAttribute('data-pet')) > -1);
+    });
+    Array.prototype.forEach.call(dewormTypeSelect.querySelectorAll('.opt'), function(el){
+      el.classList.toggle('active', el.getAttribute('data-type') === selectedDewormType);
+    });
+    var hint = document.getElementById('dewormPetHint');
+    if(dewormEditing){
+      hint.textContent = '';
+    } else {
+      hint.textContent = selectedDewormPets.length > 1 ? '（已选 '+selectedDewormPets.length+' 只，一次保存）' : '（可多选）';
+    }
+  }
+  dewormPetSelect.addEventListener('click', function(e){
+    var opt = e.target.closest('.opt');
+    if(!opt) return;
+    var pet = opt.getAttribute('data-pet');
+    if(dewormEditing){
+      selectedDewormPets = [pet];
+    } else {
+      var i = selectedDewormPets.indexOf(pet);
+      if(i === -1){ selectedDewormPets.push(pet); }
+      else if(selectedDewormPets.length > 1){ selectedDewormPets.splice(i, 1); }
+    }
+    updateDewormSelectUI();
+  });
+  dewormTypeSelect.addEventListener('click', function(e){
+    var opt = e.target.closest('.opt');
+    if(!opt) return;
+    selectedDewormType = opt.getAttribute('data-type');
+    updateDewormSelectUI();
+  });
+  document.getElementById('quickCatBtn').onclick = function(){
+    if(dewormEditing) return;
+    selectedDewormPets = ['小菊','提伯斯','小白'];
+    updateDewormSelectUI();
+  };
+
+  function openDewormSheet(record){
+    dewormForm.reset();
+    dewormEditing = !!record;
+    document.getElementById('dDelBtn').style.display = record ? 'block' : 'none';
+    document.getElementById('quickCatBtn').style.display = record ? 'none' : 'block';
+    document.getElementById('dewormTitleText').textContent = record ? '编辑驱虫记录' : '新增驱虫记录';
+    document.getElementById('dEditId').value = record ? record.id : '';
+    selectedDewormPets = record ? [record.pet] : [currentDewormPet];
+    selectedDewormType = record ? record.type : 'inner';
+    updateDewormSelectUI();
+
+    if(record){
+      document.getElementById('dBrand').value = record.brand;
+      document.getElementById('dDosage').value = record.dosage || '';
+      document.getElementById('dPrice').value = record.price || '';
+      document.getElementById('dDate').value = record.date;
+    } else {
+      document.getElementById('dDate').value = todayStr();
+    }
+    dewormMask.classList.add('show');
+  }
+  function closeDewormSheet(){ dewormMask.classList.remove('show'); }
+  document.getElementById('closeDewormSheet').onclick = closeDewormSheet;
+  dewormMask.addEventListener('click', function(e){ if(e.target === dewormMask) closeDewormSheet(); });
+
+  dewormForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var id = document.getElementById('dEditId').value;
+    var brand = document.getElementById('dBrand').value.trim();
+    var dosage = document.getElementById('dDosage').value.trim();
+    var price = document.getElementById('dPrice').value;
+    var date = document.getElementById('dDate').value;
+
+    if(!brand || !date){
+      showToast('请填写药品名称和驱虫日期');
+      return;
+    }
+    if(selectedDewormPets.length === 0){
+      showToast('请至少选择一只宠物');
+      return;
+    }
+    var priceNum = price ? parseFloat(price) : 0;
+
+    if(id){
+      var idx = dewormRecords.findIndex(function(r){return r.id===id;});
+      if(idx > -1){
+        dewormRecords[idx] = Object.assign({}, dewormRecords[idx], {
+          pet: selectedDewormPets[0], type: selectedDewormType,
+          brand: brand, dosage: dosage, price: priceNum, date: date, updatedAt: Date.now()
+        });
+      }
+      currentDewormPet = selectedDewormPets[0];
+    } else {
+      selectedDewormPets.forEach(function(pet){
+        dewormRecords.push({
+          id: uid(), pet: pet, type: selectedDewormType,
+          brand: brand, dosage: dosage, price: priceNum, date: date, updatedAt: Date.now()
+        });
+      });
+      currentDewormPet = selectedDewormPets[0];
+    }
+    saveDeworm(dewormRecords);
+    closeDewormSheet();
+    render();
+    showToast(id ? '已保存' : '已为 '+selectedDewormPets.length+' 只宠物添加记录');
+  });
+
+  document.getElementById('dDelBtn').onclick = function(){
+    var id = document.getElementById('dEditId').value;
+    if(!id) return;
+    if(!confirm('确定删除这条记录吗？')) return;
+    dewormRecords = dewormRecords.filter(function(r){return r.id!==id;});
+    saveDeworm(dewormRecords);
+    closeDewormSheet();
+    render();
+    showToast('已删除');
+  };
+
   var toastTimer = null;
   function showToast(msg){
     var t = document.getElementById('toast');
@@ -845,7 +1197,7 @@
   var importMask = document.getElementById('importMask');
 
   document.getElementById('exportBtn').onclick = function(){
-    var payload = { type:'pet_food_sync_v1', records: records };
+    var payload = { type:'pet_food_sync_v1', records: records, dewormRecords: dewormRecords };
     var text = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     document.getElementById('exportText').value = text;
     exportMask.classList.add('show');
@@ -906,10 +1258,30 @@
         }
       }
     });
+
+    var dAdded = 0, dUpdated = 0;
+    if(Array.isArray(payload.dewormRecords)){
+      payload.dewormRecords.forEach(function(incoming){
+        var idx = dewormRecords.findIndex(function(r){return r.id === incoming.id;});
+        if(idx === -1){
+          dewormRecords.push(incoming);
+          dAdded++;
+        } else {
+          var localTime = dewormRecords[idx].updatedAt || 0;
+          var incomingTime = incoming.updatedAt || 0;
+          if(incomingTime > localTime){
+            dewormRecords[idx] = incoming;
+            dUpdated++;
+          }
+        }
+      });
+      saveDeworm(dewormRecords);
+    }
+
     saveData(records);
     importMask.classList.remove('show');
     render();
-    showToast('已合并：新增'+added+'条，更新'+updated+'条');
+    showToast('已合并：口粮新增'+added+'/更新'+updated+'，驱虫新增'+dAdded+'/更新'+dUpdated);
   };
 
   // ---- Stats ----
@@ -935,6 +1307,7 @@
   }
 
   function renderStats(){
+    if(currentMode === 'deworm'){ renderDewormStats(); return; }
     var years = Array.from(new Set(records.map(function(r){ return getYear(r.buyDate); }).filter(Boolean)));
     years.sort(function(a,b){ return b.localeCompare(a); });
 
@@ -985,7 +1358,66 @@
       '</div>';
   }
 
+  var dewormStatsYear = null;
+  function renderDewormStats(){
+    var years = Array.from(new Set(dewormRecords.map(function(r){ return getYear(r.date); }).filter(Boolean)));
+    years.sort(function(a,b){ return b.localeCompare(a); });
+
+    var yearTabsEl = document.getElementById('statsYearTabs');
+    var contentEl = document.getElementById('statsContent');
+
+    if(years.length === 0){
+      yearTabsEl.innerHTML = '';
+      contentEl.innerHTML = '<div class="stats-empty">还没有驱虫记录，添加后这里会显示年度统计</div>';
+      return;
+    }
+
+    if(!dewormStatsYear || years.indexOf(dewormStatsYear) === -1){
+      dewormStatsYear = years[0];
+    }
+
+    yearTabsEl.innerHTML = years.map(function(y){
+      return '<div class="stats-year-tab '+(y===dewormStatsYear?'active':'')+'" data-year="'+y+'">'+y+'年</div>';
+    }).join('');
+    Array.prototype.forEach.call(yearTabsEl.querySelectorAll('.stats-year-tab'), function(el){
+      el.onclick = function(){
+        dewormStatsYear = el.getAttribute('data-year');
+        renderDewormStats();
+      };
+    });
+
+    var yearRecords = dewormRecords.filter(function(r){ return getYear(r.date) === dewormStatsYear; });
+    var totalCount = yearRecords.length;
+    var totalCost = yearRecords.reduce(function(s,r){ return s + (r.price || 0); }, 0);
+    var innerCount = yearRecords.filter(function(r){return r.type==='inner';}).length;
+    var outerCount = yearRecords.filter(function(r){return r.type==='outer';}).length;
+
+    // per-pet breakdown
+    var petHtml = DEWORM_PETS.map(function(p){
+      var pr = yearRecords.filter(function(r){return r.pet===p.name;});
+      if(pr.length === 0) return '';
+      var c = pr.length;
+      var cost = pr.reduce(function(s,r){ return s + (r.price || 0); }, 0);
+      return '<div class="stats-row"><span>'+(p.kind==='dog'?'🐶':'🐱')+' '+p.name+
+        '</span><span class="num">'+c+' 次 · ¥'+cost.toFixed(2)+'</span></div>';
+    }).join('');
+
+    contentEl.innerHTML =
+      '<div class="stats-block">' +
+        '<h4>💊 '+dewormStatsYear+'年驱虫总计</h4>' +
+        '<div class="stats-row"><span>驱虫总次数</span><span class="num">'+totalCount+' 次</span></div>' +
+        '<div class="stats-row"><span>体内 / 体外</span><span class="num">'+innerCount+' 次 / '+outerCount+' 次</span></div>' +
+        '<div class="stats-row"><span>驱虫总花费</span><span class="num">¥'+totalCost.toFixed(2)+'</span></div>' +
+      '</div>' +
+      '<div class="stats-block">' +
+        '<h4>🐾 各宠物明细</h4>' +
+        (petHtml || '<div class="stats-empty">本年暂无明细</div>') +
+      '</div>';
+  }
+
   document.getElementById('statsBtn').onclick = function(){
+    document.querySelector('#statsMask .sheet-title span').textContent =
+      currentMode === 'deworm' ? '驱虫年度统计' : '口粮年度统计';
     renderStats();
     statsMask.classList.add('show');
   };
