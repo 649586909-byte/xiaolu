@@ -508,8 +508,9 @@
     <div class="stats-btn" id="statsBtn">📊 年度统计</div>
   </div>
   <div class="mode-switch" id="modeSwitch">
-    <div class="mode-opt active" data-mode="food">🍚 口粮记录</div>
-    <div class="mode-opt" data-mode="deworm">💊 驱虫记录</div>
+    <div class="mode-opt active" data-mode="food">🍚 口粮</div>
+    <div class="mode-opt" data-mode="deworm">💊 驱虫</div>
+    <div class="mode-opt" data-mode="stock">📦 囤药</div>
   </div>
   <svg class="doodle-cat" viewBox="0 0 64 64" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
     <path d="M14 22 L20 8 L26 22 Z"/>
@@ -644,6 +645,46 @@
   </div>
 </div>
 
+<!-- Stock form sheet -->
+<div class="mask" id="stockMask">
+  <div class="sheet">
+    <div class="sheet-title">
+      <span id="stockTitleText">新增囤药</span>
+      <span class="close" id="closeStockSheet">✕</span>
+    </div>
+    <form id="stockForm">
+      <input type="hidden" id="sEditId">
+      <div class="form-group">
+        <label>驱虫类型</label>
+        <div class="type-select" id="stockTypeSelect">
+          <div class="opt active" data-type="inner">体内驱虫</div>
+          <div class="opt" data-type="outer">体外驱虫</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>药品品牌 / 名称</label>
+        <input type="text" id="sBrand" placeholder="例如：拜宠清 / 大宠爱" required>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>剂量 / 规格</label>
+          <input type="text" id="sDosage" placeholder="例如：1片 / 0.5ml">
+        </div>
+        <div class="form-group">
+          <label>价格（元）</label>
+          <input type="number" id="sPrice" placeholder="例如：45" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>购买日期</label>
+        <input type="date" id="sBuyDate" required>
+      </div>
+      <button type="submit" class="submit-btn">保存记录</button>
+      <div class="del-link" id="sDelBtn" style="display:none;">删除这条记录</div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- Export sheet -->
@@ -688,8 +729,9 @@
 (function(){
   var STORAGE_KEY = 'pet_food_records_v1';
   var DEWORM_KEY = 'pet_deworm_records_v1';
+  var STOCK_KEY = 'pet_dewormstock_v1';
   var currentTab = 'cat';
-  var currentMode = 'food';          // 'food' | 'deworm'
+  var currentMode = 'food';          // 'food' | 'deworm' | 'stock'
   var currentDewormPet = '努努';
 
   function loadData(){
@@ -710,8 +752,18 @@
   function saveDeworm(list){
     localStorage.setItem(DEWORM_KEY, JSON.stringify(list));
   }
+  function loadStock(){
+    try{
+      var raw = localStorage.getItem(STOCK_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function saveStock(list){
+    localStorage.setItem(STOCK_KEY, JSON.stringify(list));
+  }
   var records = loadData();
   var dewormRecords = loadDeworm();
+  var stockRecords = loadStock();
 
   var DEWORM_PETS = [
     {name:'努努', kind:'dog'},
@@ -751,6 +803,10 @@
       document.getElementById('statsBtn').style.display = '';
       renderDewormTabs();
       renderDewormList();
+    } else if(currentMode === 'stock'){
+      document.getElementById('statsBtn').style.display = 'none';
+      document.getElementById('tabs').innerHTML = '';
+      renderStockList();
     } else {
       document.getElementById('statsBtn').style.display = '';
       renderTabs();
@@ -940,6 +996,61 @@
     });
   }
 
+  // ---- Stock (已买待用) list ----
+  function renderStockList(){
+    var list = stockRecords.slice();
+    list.sort(function(a,b){ return (b.buyDate||'').localeCompare(a.buyDate||''); });
+
+    var content = document.getElementById('content');
+    if(list.length === 0){
+      content.innerHTML =
+        '<div class="empty">' +
+        '<svg viewBox="0 0 100 100" fill="none" stroke="#888" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="22" y="38" width="56" height="42" rx="3"/>' +
+        '<path d="M22 38 L30 24 L70 24 L78 38"/>' +
+        '<line x1="50" y1="24" x2="50" y2="80"/>' +
+        '<line x1="38" y1="52" x2="62" y2="52"/>' +
+        '</svg>' +
+        '<p>还没有囤的驱虫药，点击右下角 + 添加</p>' +
+        '</div>';
+      return;
+    }
+
+    var totalCost = list.reduce(function(s,r){ return s + (r.price || 0); }, 0);
+    var summary = '<div class="merge-summary">共 '+list.length+' 份待用驱虫药，囤货金额 ¥'+totalCost.toFixed(2)+'</div>';
+
+    var html = summary;
+    list.forEach(function(r){
+      var typeHtml = r.type === 'outer'
+        ? '<span class="deworm-type outer">体外驱虫</span>'
+        : '<span class="deworm-type inner">体内驱虫</span>';
+      html +=
+        '<div class="card" data-id="'+r.id+'">' +
+          '<div class="card-top">' +
+            '<div class="card-title">📦 '+escapeHtml(r.brand)+'</div>' +
+            '<div class="card-actions">' +
+              (r.price ? '<span class="price-tag">¥'+r.price+'</span>' : '') +
+              typeHtml +
+              '<div class="icon-btn edit-btn">✎</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="card-rows">' +
+            '<div class="card-row"><span class="label">类型</span><span class="value">'+(r.type==='outer'?'体外驱虫':'体内驱虫')+'</span></div>' +
+            (r.dosage ? '<div class="card-row"><span class="label">剂量 / 规格</span><span class="value">'+escapeHtml(r.dosage)+'</span></div>' : '') +
+            '<div class="card-row"><span class="label">购买日期</span><span class="value">'+fmtDate(r.buyDate)+'</span></div>' +
+          '</div>' +
+        '</div>';
+    });
+    content.innerHTML = html;
+
+    Array.prototype.forEach.call(content.querySelectorAll('.card'), function(cardEl){
+      cardEl.querySelector('.edit-btn').onclick = function(){
+        var id = cardEl.getAttribute('data-id');
+        openStockSheet(stockRecords.find(function(r){return r.id===id;}));
+      };
+    });
+  }
+
   // ---- Sheet / Form ----
   var mask = document.getElementById('mask');
   var form = document.getElementById('foodForm');
@@ -984,6 +1095,7 @@
 
   document.getElementById('fabAdd').onclick = function(){
     if(currentMode === 'deworm'){ openDewormSheet(null); }
+    else if(currentMode === 'stock'){ openStockSheet(null); }
     else { openSheet(null); }
   };
   document.getElementById('closeSheet').onclick = closeSheet;
@@ -1183,6 +1295,91 @@
     showToast('已删除');
   };
 
+  // ---- Stock form ----
+  var stockMask = document.getElementById('stockMask');
+  var stockForm = document.getElementById('stockForm');
+  var stockTypeSelect = document.getElementById('stockTypeSelect');
+  var selectedStockType = 'inner';
+
+  function updateStockSelectUI(){
+    Array.prototype.forEach.call(stockTypeSelect.querySelectorAll('.opt'), function(el){
+      el.classList.toggle('active', el.getAttribute('data-type') === selectedStockType);
+    });
+  }
+  stockTypeSelect.addEventListener('click', function(e){
+    var opt = e.target.closest('.opt');
+    if(!opt) return;
+    selectedStockType = opt.getAttribute('data-type');
+    updateStockSelectUI();
+  });
+
+  function openStockSheet(record){
+    stockForm.reset();
+    document.getElementById('sDelBtn').style.display = record ? 'block' : 'none';
+    document.getElementById('stockTitleText').textContent = record ? '编辑囤药' : '新增囤药';
+    document.getElementById('sEditId').value = record ? record.id : '';
+    selectedStockType = record ? record.type : 'inner';
+    updateStockSelectUI();
+
+    if(record){
+      document.getElementById('sBrand').value = record.brand;
+      document.getElementById('sDosage').value = record.dosage || '';
+      document.getElementById('sPrice').value = record.price || '';
+      document.getElementById('sBuyDate').value = record.buyDate;
+    } else {
+      document.getElementById('sBuyDate').value = todayStr();
+    }
+    stockMask.classList.add('show');
+  }
+  function closeStockSheet(){ stockMask.classList.remove('show'); }
+  document.getElementById('closeStockSheet').onclick = closeStockSheet;
+  stockMask.addEventListener('click', function(e){ if(e.target === stockMask) closeStockSheet(); });
+
+  stockForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var id = document.getElementById('sEditId').value;
+    var brand = document.getElementById('sBrand').value.trim();
+    var dosage = document.getElementById('sDosage').value.trim();
+    var price = document.getElementById('sPrice').value;
+    var buyDate = document.getElementById('sBuyDate').value;
+
+    if(!brand || !buyDate){
+      showToast('请填写药品名称和购买日期');
+      return;
+    }
+    var priceNum = price ? parseFloat(price) : 0;
+
+    if(id){
+      var idx = stockRecords.findIndex(function(r){return r.id===id;});
+      if(idx > -1){
+        stockRecords[idx] = Object.assign({}, stockRecords[idx], {
+          type: selectedStockType, brand: brand, dosage: dosage,
+          price: priceNum, buyDate: buyDate, updatedAt: Date.now()
+        });
+      }
+    } else {
+      stockRecords.push({
+        id: uid(), type: selectedStockType, brand: brand, dosage: dosage,
+        price: priceNum, buyDate: buyDate, updatedAt: Date.now()
+      });
+    }
+    saveStock(stockRecords);
+    closeStockSheet();
+    render();
+    showToast('已保存');
+  });
+
+  document.getElementById('sDelBtn').onclick = function(){
+    var id = document.getElementById('sEditId').value;
+    if(!id) return;
+    if(!confirm('确定删除这条记录吗？')) return;
+    stockRecords = stockRecords.filter(function(r){return r.id!==id;});
+    saveStock(stockRecords);
+    closeStockSheet();
+    render();
+    showToast('已删除');
+  };
+
   var toastTimer = null;
   function showToast(msg){
     var t = document.getElementById('toast');
@@ -1197,7 +1394,7 @@
   var importMask = document.getElementById('importMask');
 
   document.getElementById('exportBtn').onclick = function(){
-    var payload = { type:'pet_food_sync_v1', records: records, dewormRecords: dewormRecords };
+    var payload = { type:'pet_food_sync_v1', records: records, dewormRecords: dewormRecords, stockRecords: stockRecords };
     var text = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     document.getElementById('exportText').value = text;
     exportMask.classList.add('show');
@@ -1278,10 +1475,29 @@
       saveDeworm(dewormRecords);
     }
 
+    var sAdded = 0, sUpdated = 0;
+    if(Array.isArray(payload.stockRecords)){
+      payload.stockRecords.forEach(function(incoming){
+        var idx = stockRecords.findIndex(function(r){return r.id === incoming.id;});
+        if(idx === -1){
+          stockRecords.push(incoming);
+          sAdded++;
+        } else {
+          var localTime = stockRecords[idx].updatedAt || 0;
+          var incomingTime = incoming.updatedAt || 0;
+          if(incomingTime > localTime){
+            stockRecords[idx] = incoming;
+            sUpdated++;
+          }
+        }
+      });
+      saveStock(stockRecords);
+    }
+
     saveData(records);
     importMask.classList.remove('show');
     render();
-    showToast('已合并：口粮新增'+added+'/更新'+updated+'，驱虫新增'+dAdded+'/更新'+dUpdated);
+    showToast('已合并：口粮+'+added+'/'+updated+'，驱虫+'+dAdded+'/'+dUpdated+'，囤药+'+sAdded+'/'+sUpdated);
   };
 
   // ---- Stats ----
